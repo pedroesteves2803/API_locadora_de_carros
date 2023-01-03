@@ -9,19 +9,19 @@
                         <div class="row">
                             <div class="col mb-3">
                                 <input-container-component titulo="ID" id="inputID" id-help="idHelp" texto-ajuda="Opcional. Informe o ID da marca">
-                                    <input type="number" class="form-control" id="inputID" aria-describedby="idHelp" placeholder="ID">
+                                    <input type="number" class="form-control" id="inputID" aria-describedby="idHelp" placeholder="ID" v-model="busca.id">
                                 </input-container-component>
                             </div>
                             <div class="col mb-3">
                                 <input-container-component titulo="Nome da marca" id="inputNome" id-help="idHelp" texto-ajuda="Opcional. Informe o nome da marca">
-                                    <input type="text" class="form-control" id="inputNome" aria-describedby="inputNome" placeholder="Nome da marca">
+                                    <input type="text" class="form-control" id="inputNome" aria-describedby="inputNome" placeholder="Nome da marca" v-model="busca.nome">
                                 </input-container-component>
                             </div>
                         </div>
                     </template>
 
                     <template v-slot:rodape>
-
+                        <button type="submit" class="btn btn-primary btn-sm float-right" @click="pesquisar()">Pesquisar</button>
                     </template>
 
                 </card-component>
@@ -30,11 +30,33 @@
                 <!-- inicio card de busca -->
                 <card-component titulo="Relação de marcas">
                     <template v-slot:conteudo>
-                        <table-component></table-component>
+                        <table-component
+                            :dados="marcas.data"
+                            :visualizar= "{ visivel: true, dataToggle: 'modal', dataTarget: '#modalMarcaVisualizar'}"
+                            :atualizar= "true"
+                            :remover= "{ visivel: true, dataToggle: 'modal', dataTarget: '#modalMarcaRemover'}"
+                            :titulos="{
+                                id: {titulo: 'ID' , tipo: 'text'},
+                                nome: {titulo: 'Nome' , tipo: 'text'},
+                                imagem: {titulo: 'Imagem' , tipo: 'imagem'},
+                                created_at: {titulo: 'Data de criação' , tipo: 'data'}
+                            }"
+                        ></table-component>
                     </template>
 
                     <template v-slot:rodape>
-                        <button type="button" class="btn btn-primary btn-sm float-end" data-bs-toggle="modal" data-bs-target="#modalMarca">Adicionar</button>
+                        <div class="row">
+                            <div class="col-10">
+                                <paginate-component>
+                                    <li v-for="l, key in marcas.links" :key="key" :class="l.active ? 'page-item active' : 'page-item'" @click="paginacao(l)">
+                                        <a class="page-link" v-html="l.label"></a>
+                                    </li>
+                                </paginate-component>
+                            </div>
+                            <div class="col">
+                                <button type="button" class="btn btn-primary btn-sm float-end" data-bs-toggle="modal" data-bs-target="#modalMarca">Adicionar</button>
+                            </div>
+                        </div>
                     </template>
                 </card-component>
                 <!-- fim card de busca -->
@@ -68,11 +90,65 @@
             </template>
         </modal-component>
 
+        <modal-component id="modalMarcaVisualizar" titulo="Visualizar marca">
+
+            <template v-slot:alertas>
+            </template>
+
+            <template v-slot:conteudo>
+                <input-container-component titulo="ID">
+                    <input type="text" class="form-control" :value="$store.state.item.id" disabled>
+                </input-container-component>
+
+                <input-container-component titulo="Nome da marca">
+                    <input type="text" class="form-control" :value="$store.state.item.nome" disabled>
+                </input-container-component>
+
+                <input-container-component titulo="Imagem">
+                    <img :src="'storage/'+$store.state.item.imagem" v-if="$store.state.item.imagem">
+                </input-container-component>
+
+                <input-container-component titulo="Data de criaçao">
+                    <input type="text" class="form-control" :value="$store.state.item.created_at" disabled>
+                </input-container-component>
+            </template>
+
+            <template v-slot:rodape>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+            </template>
+        </modal-component>
+
+        <modal-component id="modalMarcaRemover" titulo="Remover marca">
+
+            <template v-slot:alertas>
+                <alert-component tipo="success" titulo="Transação realizada com sucesso"></alert-component>
+                <alert-component tipo="danger" titulo="Erro na transação"></alert-component>
+            </template>
+
+            <template v-slot:conteudo>
+                <input-container-component titulo="ID">
+                    <input type="text" class="form-control" :value="$store.state.item.id" disabled>
+                </input-container-component>
+
+                <input-container-component titulo="Nome da marca">
+                    <input type="text" class="form-control" :value="$store.state.item.nome" disabled>
+                </input-container-component>
+
+            </template>
+
+            <template v-slot:rodape>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                <button type="button" class="btn btn-danger" data-bs-dismiss="modal" @click="remover()">Remover</button>
+            </template>
+        </modal-component>
+
     </div>
 </template>
 
 <script>
+import Alert from './Alert.vue';
     export default {
+  components: { Alert },
         computed: {
             token(){
                 let token = document.cookie.split(';').find(indice => {
@@ -87,13 +163,90 @@
         data() {
             return {
                 urlBase: "http://127.0.0.1:8000/api/v1/marca",
+                urlPaginacao: '',
+                urlFiltro: '',
                 nomeMarca: '',
                 arquivoImagem: [],
                 transacaoStatus: '',
                 transacaoDetalhes: {},
+                marcas: { data: [] },
+                busca: {id: '', nome: ''},
             }
         },
         methods: {
+            remover(){
+                let confirmacao = confirm('Tem certeza que deseja remover esse registro?');
+
+                if(!confirmacao){
+                     return false;
+                }
+
+                let url = this.urlBase + '/' + this.$store.state.item.id;
+
+                let formData = new FormData();
+                formData.append('_method', 'delete');
+
+                let config = {
+                    headers: {
+                        'Accept': 'application/json',
+                        'Authorization': this.token
+                    }
+                }
+
+                // axios.post(url, formData, config)
+                //     .then(response => {
+                //         console.log('removido', response);
+                //         this.carregarLista();
+                //     })
+                //     .catch(error => {
+                //         Console.log('Erro ao remover marca', error.response);
+                //     });
+            },
+            pesquisar() {
+                let filtro = '';
+
+                for(let chave in this.busca){
+                    if(this.busca[chave]){
+                        if(filtro != ''){
+                            filtro = filtro + ";";
+                        }
+                        filtro += chave + ':like:' + this.busca[chave];
+                    }
+                }
+
+                if(filtro != ''){
+                    this.urlPaginacao = 'page=1';
+                    this.urlFiltro = "&filtro="+filtro;
+                }else{
+                    this.urlFiltro = '';
+                }
+
+                this.carregarLista();
+            },
+            paginacao(l) {
+                if(l.url){
+                    this.urlPaginacao = l.url.split('?')[1];
+                    this.carregarLista();
+                }
+            },
+            carregarLista(){
+
+                let url = this.urlBase + '?' + this.urlPaginacao + this.urlFiltro;
+                let config = {
+                    headers: {
+                        'Accept': 'application/json',
+                        'Authorization': this.token
+                    }
+                }
+
+                axios.get(url, config)
+                    .then(response =>{
+                        this.marcas = response.data;
+                    })
+                    .catch(error =>{
+                        console.log(error);
+                    });
+            },
             carregarImagem(e){
                 this.arquivoImagem = e.target.files;
             },
@@ -116,7 +269,6 @@
                         this.transacaoDetalhes = {
                             mensagem: 'ID do registro:' + detalhes.data.id
                         }
-                        console.log(response);
                     })
                     .catch(error => {
                         this.transacaoStatus = 'erro';
@@ -127,6 +279,9 @@
                     });
             }
 
+        },
+        mounted() {
+            this.carregarLista();
         }
     }
 </script>

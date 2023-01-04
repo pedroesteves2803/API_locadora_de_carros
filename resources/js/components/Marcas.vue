@@ -33,7 +33,7 @@
                         <table-component
                             :dados="marcas.data"
                             :visualizar= "{ visivel: true, dataToggle: 'modal', dataTarget: '#modalMarcaVisualizar'}"
-                            :atualizar= "true"
+                            :atualizar= "{ visivel: true, dataToggle: 'modal', dataTarget: '#modalMarcaAtualizar'}"
                             :remover= "{ visivel: true, dataToggle: 'modal', dataTarget: '#modalMarcaRemover'}"
                             :titulos="{
                                 id: {titulo: 'ID' , tipo: 'text'},
@@ -121,11 +121,11 @@
         <modal-component id="modalMarcaRemover" titulo="Remover marca">
 
             <template v-slot:alertas>
-                <alert-component tipo="success" titulo="Transação realizada com sucesso"></alert-component>
-                <alert-component tipo="danger" titulo="Erro na transação"></alert-component>
+                <alert-component tipo="success" titulo="Transação realizada com sucesso" :detalhes=$store.state.transacao v-if="$store.state.transacao.status == 'sucesso'"></alert-component>
+                <alert-component tipo="danger" titulo="Erro na transação" :detalhes=$store.state.transacao v-if="$store.state.transacao.status == 'erro'"></alert-component>
             </template>
 
-            <template v-slot:conteudo>
+            <template v-slot:conteudo v-if="$store.state.transacao.status != 'sucesso'">
                 <input-container-component titulo="ID">
                     <input type="text" class="form-control" :value="$store.state.item.id" disabled>
                 </input-container-component>
@@ -138,10 +138,36 @@
 
             <template v-slot:rodape>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
-                <button type="button" class="btn btn-danger" data-bs-dismiss="modal" @click="remover()">Remover</button>
+                <button type="button" class="btn btn-danger" @click="remover()" v-if="$store.state.transacao.status != 'sucesso'">Remover</button>
             </template>
         </modal-component>
 
+        <modal-component id="modalMarcaAtualizar" titulo="Atualizar marca">
+
+            <template v-slot:alertas>
+                <alert-component tipo="success" titulo="Transação realizada com sucesso" :detalhes=$store.state.transacao v-if="$store.state.transacao.status == 'sucesso'"></alert-component>
+                <alert-component tipo="danger" titulo="Erro na transação" :detalhes=$store.state.transacao v-if="$store.state.transacao.status == 'erro'"></alert-component>
+            </template>
+
+            <template v-slot:conteudo>
+                <div class="form-group">
+                    <input-container-component titulo="Nome da marca" id="atualizarNome" id-help="novoNomeHelp" texto-ajuda="Informe o nome da marca">
+                        <input type="text" class="form-control" id="atualizarNome" aria-describedby="novoNomeHelp" placeholder="Nome da marca" v-model="$store.state.item.nome">
+                    </input-container-component>
+                </div>
+
+                <div class="form-group">
+                    <input-container-component titulo="Imagem" id="atualizarImagem" id-help="novoImagemHelp" texto-ajuda="Selecione uma imagem no formato PNG">
+                        <input type="file" class="form-control" id="atualizarImagem" aria-describedby="novoImagemHelp" placeholder="Selecione uma imagem" @change="carregarImagem($event)">
+                    </input-container-component>
+                </div>
+            </template>
+
+            <template v-slot:rodape>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                <button type="button" class="btn btn-primary" @click="atualizar()">Atualizar</button>
+            </template>
+        </modal-component>
     </div>
 </template>
 
@@ -149,17 +175,6 @@
 import Alert from './Alert.vue';
     export default {
   components: { Alert },
-        computed: {
-            token(){
-                let token = document.cookie.split(';').find(indice => {
-                    return indice.startsWith('token=');
-                });
-
-                token = token.split('=')[1]
-                token = 'Bearer ' + token;
-                return token;
-            }
-        },
         data() {
             return {
                 urlBase: "http://127.0.0.1:8000/api/v1/marca",
@@ -174,6 +189,37 @@ import Alert from './Alert.vue';
             }
         },
         methods: {
+            atualizar() {
+
+                let formData = new FormData();
+                formData.append('_method', 'patch');
+                formData.append('nome', this.$store.state.item.nome);
+
+                if(this.arquivoImagem[0]) {
+                    formData.append('imagem', this.arquivoImagem[0]);
+                }
+
+                let url = this.urlBase + '/' + this.$store.state.item.id;
+
+                let config = {
+                    headers: {
+                        'Content-Type': 'multipart/form-data',
+                    }
+                }
+
+                axios.post(url, formData, config)
+                    .then(response => {
+                        atualizarImagem.value = '';
+                        this.$store.state.transacao.status = 'sucesso';
+                        this.$store.state.transacao.mensagem = 'Registro de marca atualizado com sucesso!';
+                        this.carregarLista();
+                    })
+                    .catch(error => {
+                        this.$store.state.transacao.status = 'erro';
+                        this.$store.state.transacao.mensagem = error.response.data.message;
+                        this.$store.state.transacao.dados = error.response.data.errors;
+                    });
+            },
             remover(){
                 let confirmacao = confirm('Tem certeza que deseja remover esse registro?');
 
@@ -186,21 +232,16 @@ import Alert from './Alert.vue';
                 let formData = new FormData();
                 formData.append('_method', 'delete');
 
-                let config = {
-                    headers: {
-                        'Accept': 'application/json',
-                        'Authorization': this.token
-                    }
-                }
-
-                // axios.post(url, formData, config)
-                //     .then(response => {
-                //         console.log('removido', response);
-                //         this.carregarLista();
-                //     })
-                //     .catch(error => {
-                //         Console.log('Erro ao remover marca', error.response);
-                //     });
+                axios.post(url, formData)
+                    .then(response => {
+                        this.$store.state.transacao.status = 'sucesso';
+                        this.$store.state.transacao.mensagem = response.data.msg;
+                        this.carregarLista();
+                    })
+                    .catch(error => {
+                        this.$store.state.transacao.status = 'erro';
+                        this.$store.state.transacao.mensagem = error.response.data.erro;
+                    });
             },
             pesquisar() {
                 let filtro = '';
@@ -232,14 +273,8 @@ import Alert from './Alert.vue';
             carregarLista(){
 
                 let url = this.urlBase + '?' + this.urlPaginacao + this.urlFiltro;
-                let config = {
-                    headers: {
-                        'Accept': 'application/json',
-                        'Authorization': this.token
-                    }
-                }
 
-                axios.get(url, config)
+                axios.get(url,)
                     .then(response =>{
                         this.marcas = response.data;
                     })
@@ -258,8 +293,6 @@ import Alert from './Alert.vue';
                 let config = {
                     headers: {
                         'Content-type': 'multipart/form-data',
-                        'Accept': 'application/json',
-                        'Authorization': this.token
                     }
                 }
 
@@ -267,10 +300,11 @@ import Alert from './Alert.vue';
                     .then(response => {
                         this.transacaoStatus = 'adicionado';
                         this.transacaoDetalhes = {
-                            mensagem: 'ID do registro:' + detalhes.data.id
+                            mensagem: 'ID do registro:' + response.data.id
                         }
                     })
                     .catch(error => {
+                        console.log(error);
                         this.transacaoStatus = 'erro';
                         this.transacaoDetalhes = {
                             mensagem: error.response.data.message,

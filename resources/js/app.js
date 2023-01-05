@@ -42,6 +42,9 @@ Vue.component('card-component', require('./components/Card.vue').default);
 Vue.component('modal-component', require('./components/Modal.vue').default);
 Vue.component('alert-component', require('./components/Alert.vue').default);
 Vue.component('paginate-component', require('./components/Paginate.vue').default);
+Vue.component('table-dashboard-component', require('./components/TableDashboard.vue').default);
+Vue.component('carros-component', require('./components/Carros.vue').default);
+Vue.component('modelos-component', require('./components/Modelos.vue').default);
 
 /**
  * Next, we will create a fresh Vue application instance and attach it to
@@ -64,6 +67,16 @@ Vue.filter('formataDataTempo', function(d){
     tempo = tempo[0];
 
     return data + ' ' + tempo;
+});
+
+Vue.filter('formataDisponibilidade', function(d){
+
+    if(d){
+        return 'Sim'
+    }
+
+    return 'Não'
+
 });
 
 const app = new Vue({

@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::get('/', function () {
-    return view('welcome');
+    return redirect()->route('login');
 });
 
 
@@ -27,3 +27,11 @@ Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name
 Route::get('/marcas', function(){
     return view('app.marcas');
 })->name('marcas')->middleware('auth');
+
+Route::get('/carros', function(){
+    return view('app.carros');
+})->name('carros')->middleware('auth');
+
+Route::get('/modelos', function(){
+    return view('app.modelos');
+})->name('modelos')->middleware('auth');

@@ -109,7 +109,7 @@
                 </input-container-component>
 
                 <input-container-component titulo="Data de criaçao">
-                    <input type="text" class="form-control" :value="$store.state.item.created_at" disabled>
+                    <input type="text" class="form-control" :value="$store.state.item.created_at | formataDataTempo" disabled>
                 </input-container-component>
             </template>
 
@@ -168,12 +168,15 @@
                 <button type="button" class="btn btn-primary" @click="atualizar()">Atualizar</button>
             </template>
         </modal-component>
+
+
     </div>
+
 </template>
 
 <script>
 import Alert from './Alert.vue';
-    export default {
+export default {
   components: { Alert },
         data() {
             return {
@@ -251,7 +254,7 @@ import Alert from './Alert.vue';
                         if(filtro != ''){
                             filtro = filtro + ";";
                         }
-                        filtro += chave + ':like:' + this.busca[chave];
+                        filtro += chave + ':like:' + this.busca[chave]+'%';
                     }
                 }
 
@@ -274,7 +277,7 @@ import Alert from './Alert.vue';
 
                 let url = this.urlBase + '?' + this.urlPaginacao + this.urlFiltro;
 
-                axios.get(url,)
+                axios.get(url)
                     .then(response =>{
                         this.marcas = response.data;
                     })
